@@ -1,0 +1,11 @@
+[package]
+edition = "2021"
+name = "weaklink_build"
+rust-version = "1.59"
+version = "0.1.0"
+
+[dependencies]
+goblin = {git = "https://github.com/vadimcn/goblin.git"}
+rand = "0.8.5"
+superslice = "1.0.0"
+weaklink = {path = "../weaklink"}

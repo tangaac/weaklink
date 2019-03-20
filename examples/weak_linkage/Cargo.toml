@@ -1,0 +1,16 @@
+[package]
+edition = "2021"
+name = "weak_linkage"
+version = "0.1.0"
+
+[dependencies]
+weaklink = {path = "../../weaklink"}
+utils = {path = "../utils"}
+exporter = {path = "../exporter"}
+importer = {path = "../importer"}
+
+[build-dependencies]
+weaklink_build = {path = "../../weaklink_build"}
+utils = {path = "../utils"}
+exporter = {path = "../exporter"}
+importer = {path = "../importer"}

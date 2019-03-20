@@ -1,0 +1,54 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug weak_linkage",
+            "preLaunchTask": "cargo build weak_linkage",
+            "program": "${workspaceFolder}/target/debug/weak_linkage",
+            "cwd": "${workspaceFolder}",
+            "terminal": "integrated",
+            "env": {
+                "LD_LIBRARY_PATH": "${workspaceFolder}/target/debug"
+            }
+        },
+        {
+            "type": "lldb",
+            "request": "custom",
+            "name": "Debug weak_linkage (aarch64)",
+            "preLaunchTask": "cargo build weak_linkage (aarch64)",
+            "targetCreateCommands": [
+                "target create ${workspaceFolder}/target/aarch64-unknown-linux-gnu/debug/weak_linkage"
+            ],
+            "processCreateCommands": [
+                "gdb-remote 127.0.0.1:12345",
+                "platform select remote-linux",
+                "target modules load --file ${workspaceFolder}/target/aarch64-unknown-linux-gnu/debug/weak_linkage -s 0x4000000000"
+            ],
+            "sourceMap": {
+                "/project": "${workspaceFolder}"
+            }
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug dump_exports",
+            "cargo": {
+                "args": ["build", "--package=dump_exports"]
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug dump_imports",
+            "cargo": {
+                "args": ["build", "--package=dump_imports"]
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+    ]
+}

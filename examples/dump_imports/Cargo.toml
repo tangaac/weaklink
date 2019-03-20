@@ -1,0 +1,12 @@
+[package]
+edition = "2021"
+name = "dump_imports"
+version = "0.1.0"
+
+[dependencies]
+weaklink = {path = "../../weaklink"}
+weaklink_build = {path = "../../weaklink_build"}
+
+[dev-dependencies]
+importer = {path = "../importer"}
+utils = {path = "../utils"}

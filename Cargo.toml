@@ -1,0 +1,11 @@
+[workspace]
+members = [
+  "weaklink",
+  "weaklink_build",
+  "examples/exporter",
+  "examples/importer",
+  "examples/weak_linkage",
+  "examples/dump_exports",
+  "examples/dump_imports",
+  "examples/utils",
+]

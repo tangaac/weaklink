@@ -1,0 +1,9 @@
+[build.env]
+passthrough = [
+  "RUST_BACKTRACE",
+  "RUST_LOG",
+  "RUSTC_BOOTSTRAP",
+]
+
+[target.x86_64-apple-darwin]
+image = "docker.io/freeznet/x86_64-apple-darwin-cross:11.3.1"

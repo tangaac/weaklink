@@ -1,0 +1,96 @@
+{
+    // See https://go.microsoft.com/fwlink/?LinkId=733558 
+    // for the documentation about the tasks.json format
+    "version": "2.0.0",
+    "presentation": {
+        "clear": true
+    },
+    "problemMatcher": "$rustc",
+    "tasks": [
+        {
+            "type": "process",
+            "label": "cargo check",
+            "command": "cargo",
+            "args": [
+                "check"
+            ],
+            "group": "build"
+        },
+        {
+            "type": "process",
+            "label": "cargo doc weaklink",
+            "command": "cargo",
+            "args": [
+                "doc",
+                "--lib",
+                "--no-deps",
+                "--package=weaklink"
+            ],
+            "group": "build"
+        },
+        {
+            "type": "process",
+            "label": "cargo build weak_linkage",
+            "command": "cargo",
+            "args": [
+                "build",
+                "--package=weak_linkage"
+            ],
+            "group": "build"
+        },
+        {
+            "type": "process",
+            "label": "cargo run weak_linkage",
+            "command": "cargo",
+            "args": [
+                "run",
+                "--package=weak_linkage"
+            ],
+            "group": "build"
+        },
+        {
+            "type": "process",
+            "label": "cargo build weak_linkage (aarch64)",
+            "command": "cross",
+            "args": [
+                "build",
+                "--package=weak_linkage",
+                "--target=aarch64-unknown-linux-gnu"
+            ],
+            "group": "build"
+        },
+        {
+            "type": "process",
+            "label": "cargo run weak_linkage (aarch64)",
+            "command": "cross",
+            "args": [
+                "run",
+                "--package=weak_linkage",
+                "--target=aarch64-unknown-linux-gnu"
+            ],
+            "group": "build"
+        },
+        {
+            "type": "process",
+            "label": "cargo build weak_linkage (arm)",
+            "command": "cross",
+            "args": [
+                "build",
+                "--package=weak_linkage",
+                "--target=armv7-unknown-linux-gnueabihf"
+            ],
+            "group": "build"
+        },
+        {
+            "type": "process",
+            "label": "cargo run weak_linkage (arm)",
+            "command": "cross",
+            "args": [
+                "run",
+                "--package=weak_linkage",
+                "--target=armv7-unknown-linux-gnueabihf"
+            ],
+            "group": "build"
+        },
+    ]
+}
