@@ -43,7 +43,7 @@ use std::{
 
 pub type Error = Box<dyn std::error::Error>;
 
-mod loading;
+pub mod loading;
 
 /// Represents a weakly linked dynamic library.
 #[repr(C)]
@@ -77,7 +77,7 @@ impl Library {
         } else {
             for name in self.dylib_names {
                 let cpath = CString::new(*name).unwrap();
-                if let Ok(handle) = unsafe { loading::load_library(&cpath) } {
+                if let Ok(handle) = loading::load_library(&cpath) {
                     self.handle.store(handle.0, Ordering::Release);
                     return Ok(handle);
                 }
@@ -93,7 +93,7 @@ impl Library {
             Err("Already loaded.".into())
         } else {
             let cpath = CString::new(path.as_os_str().to_str().unwrap().as_bytes()).unwrap();
-            match unsafe { loading::load_library(&cpath) } {
+            match loading::load_library(&cpath) {
                 Ok(handle) => {
                     self.handle.store(handle.0, Ordering::Release);
                     Ok(handle)
