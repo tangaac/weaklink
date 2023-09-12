@@ -8,11 +8,17 @@ fn main() {
     let path = utils::find_deps_dylib("exporter").unwrap();
     println!("Loading {}", path.display());
     stubs::exporter_stub.load_from(&path).unwrap();
+
+    // Test lazy binding
+    let result = importer::addition1(0);
+    println!("result 1: {}", result);
+
+    // Test resolution of API group
     stubs::base.resolve_uncached().unwrap();
+    let result = importer::addition2(0);
+    println!("result 2: {}", result);
 
-    let result = importer::addition(0);
-    println!("result: {}", result);
-
+    // Test resolution of missing symbols
     assert!(!stubs::missing.resolve());
 
     println!("OK");

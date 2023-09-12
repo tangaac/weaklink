@@ -32,6 +32,22 @@ impl super::StubGenerator for ArmStubGenerator {
         );
     }
 
+    fn write_binder_stub(&self, text: &mut dyn Write, resolver: &str) {
+        write_lines!(text,
+            "    push {{{{ r0, r1, r2, r3, lr }}}}"
+            "    mov r7, sp"
+            // Re-align stack to 8 bytes
+            "    bic sp, sp, #7"
+            "    mov r0, r12"
+            "    bl {resolver}"
+            "    mov r12, r0"
+            "    mov sp, r7"
+            "    pop {{{{ r0, r1, r2, r3, lr }}}}"
+            "    bx r12",
+            resolver=resolver
+        );
+    }
+
     fn data_ptr_directive(&self) -> &str {
         ".long"
     }

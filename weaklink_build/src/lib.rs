@@ -60,7 +60,7 @@ pub struct Config {
     /// Default: true
     pub adjust_symbol_names: bool,
     /// Whether to support lazy binding. Default: false
-    lazy_binding: bool,
+    pub lazy_binding: bool,
     // The list of symbol stubs created so far.
     stubs: Vec<SymbolStub>,
     // Look up index in `stubs` by the export name.
@@ -226,6 +226,19 @@ impl Config {
             panic!("Unsupported target");
         };
 
-        stub_gen.generate(text, stubs.as_ref(), &sym_table, self.lazy_binding);
+        let sym_reslver = if self.lazy_binding {
+            write_lines!(text,
+                "#[no_mangle]"
+                "extern \"C\" fn sym_resolver(index: u32) -> Address {{"
+                "    {name}.lazy_resolve(index)"
+                "}}",
+                name = self.name
+            );
+            Some("sym_resolver")
+        } else {
+            None
+        };
+
+        stub_gen.generate(text, stubs.as_ref(), &sym_table, sym_reslver);
     }
 }

@@ -27,5 +27,5 @@ fn test_imports() {
             adds_found += 1;
         }
     }
-    assert_eq!(adds_found, utils::num_repetitions());
+    assert_eq!(adds_found, 1000);
 }

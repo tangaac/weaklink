@@ -7,4 +7,5 @@ edition = "2021"
 crate-type = ["cdylib"]
 
 [dependencies]
+seq-macro = "0.3.5"
 utils = {path = "../utils"}

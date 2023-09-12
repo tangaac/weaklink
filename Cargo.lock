@@ -32,6 +32,7 @@ dependencies = [
 name = "exporter"
 version = "0.1.0"
 dependencies = [
+ "seq-macro",
  "utils",
 ]
 
@@ -60,6 +61,7 @@ dependencies = [
 name = "importer"
 version = "0.1.0"
 dependencies = [
+ "seq-macro",
  "utils",
 ]
 

@@ -3,21 +3,6 @@ use std::io;
 use std::path::PathBuf;
 use std::process::Command;
 
-pub use seq_macro::seq;
-
-#[macro_export]
-macro_rules! repeat {
-    ($n:ident in { $($t:tt)*} ) => {
-        $crate::seq!($n in 0..1000 { $($t)* });
-    }
-}
-
-pub const fn num_repetitions() -> u32 {
-    let mut n = 0;
-    repeat!(N in { n += 1; });
-    n
-}
-
 pub fn add_runner(command: Command) -> Command {
     for (key, value) in env::vars() {
         if key.starts_with("CARGO_TARGET_") && key.ends_with("_RUNNER") {

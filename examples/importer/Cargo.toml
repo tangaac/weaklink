@@ -4,4 +4,5 @@ name = "importer"
 version = "0.1.0"
 
 [dependencies]
+seq-macro = "0.3.5"
 utils = {path = "../utils"}

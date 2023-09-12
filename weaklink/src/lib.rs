@@ -129,6 +129,33 @@ impl Library {
         }
     }
 
+    // Resolve symbol address.
+    fn resolve_symbol_uncached(&self, sym_index: u32) -> Result<Address, Error> {
+        let handle = self.ensure_loaded();
+        let sym_name = self.symbol_names[sym_index as usize];
+        loading::find_symbol(handle, sym_name)
+    }
+
+    // Resolve symbol address and update its entry in the symbol table.
+    fn resolve_symbol(&self, sym_index: u32) -> Result<Address, Error> {
+        let result = self.resolve_symbol_uncached(sym_index);
+        if let Ok(address) = &result {
+            unsafe {
+                self.symbol_table_entry(sym_index as usize).write(*address);
+            }
+        }
+        result
+    }
+
+    // This entry is called to resolve symbols at call time, so it panicks on error.
+    #[doc(hidden)]
+    pub fn lazy_resolve(&self, sym_index: u32) -> Address {
+        match self.resolve_symbol(sym_index) {
+            Ok(sym_addr) => sym_addr,
+            Err(err) => panic!("Symbol not found: {}", err),
+        }
+    }
+
     // Get a reference to symbol pointer.
     unsafe fn symbol_table_entry(&self, sym_index: usize) -> *mut Address {
         let ptr: &UnsafeCell<Address> = mem::transmute(&self.symbol_table[0]);
@@ -160,16 +187,9 @@ impl Group {
 
     /// Attempt to resolve all symbols in the group.
     pub fn resolve_uncached(&self) -> Result<(), Error> {
-        let handle = self.library.ensure_loaded();
-        unsafe {
-            for sym_index in self.sym_indices {
-                let sym_index = *sym_index as usize;
-                let sym_name = self.library.symbol_names[sym_index];
-                let sym_addr = match loading::find_symbol(handle, sym_name) {
-                    Ok(sym_addr) => sym_addr,
-                    Err(err) => return Err(err),
-                };
-                self.library.symbol_table_entry(sym_index).write(sym_addr);
+        for sym_index in self.sym_indices {
+            if let Err(err) = self.library.resolve_symbol(*sym_index) {
+                return Err(err);
             }
         }
         Ok(())

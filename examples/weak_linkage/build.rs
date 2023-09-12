@@ -15,16 +15,6 @@ fn main() {
     let path = utils::find_latest_deps_artifact(|name| name.contains("importer") && name.ends_with(".rlib")).unwrap();
     let imports = imports::archive_imports(&path).unwrap();
 
-    // println!("cargo:warning=--- Imports ---");
-    // for imp in &imports {
-    //     println!("cargo:warning={}", imp.name);
-    // }
-
-    // println!("cargo:warning=--- Exports ---");
-    // for exp in &exports {
-    //     println!("cargo:warning={} {:?}", exp.name, exp.section);
-    // }
-
     let imports_str = HashSet::<String>::from_iter(imports.iter().map(|i| i.name.clone()));
     let exports_str = HashSet::<String>::from_iter(exports.iter().map(|e| e.name.clone()));
     let common = exports_str.intersection(&imports_str).collect::<HashSet<_>>();
@@ -45,6 +35,7 @@ fn main() {
     let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
     let source_path = out_dir.join("stubs.rs");
     let mut source = File::create(&source_path).unwrap();
+    config.lazy_binding = true;
     config.generate_source(&mut source);
     println!("cargo:rerun-if-changed={}", source_path.display());
     println!("cargo:warning=Generated {}", source_path.display());
