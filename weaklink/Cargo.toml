@@ -3,3 +3,9 @@ edition = "2021"
 name = "weaklink"
 rust-version = "1.59"
 version = "0.1.0"
+
+[dependencies]
+thread_local = {version = "1.1", optional = true}
+
+[features]
+checked = ["thread_local"]

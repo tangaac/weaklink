@@ -2,23 +2,31 @@ use crate::util::iter_fmt;
 use crate::SymbolStub;
 use std::io::Write;
 
+#[derive(PartialEq, Eq)]
+pub(crate) enum TargetOs {
+    Linux,
+    MacOS,
+    Windows,
+}
+
 pub(crate) trait StubGenerator {
     fn generate(&self, text: &mut dyn Write, symbols: &[SymbolStub], symbol_table: &str, sym_resolver: Option<&str>) {
         write_lines!(text,
             "global_asm!{{\""
+            ".cfi_sections"
             ".data"
             ".p2align 2, 0x0"
-            "{symbol_table}:"
-            "_{symbol_table}:"
+            "{pfx}{symbol_table}:"
             "{entries}"
             "\"}}",
+            pfx = self.asm_symbol_prefix(),
             symbol_table = symbol_table,
             entries = iter_fmt(symbols.iter().enumerate(), |f, (idx, sym)| {
-                write!(f, "    {} ", self.data_ptr_directive());
-                if sym_resolver.is_some() && !sym.is_data { 
-                    writeln!(f, "resolve_{idx}") 
-                } else { 
-                    writeln!(f, "0") 
+                let dir=self.data_ptr_directive();
+                if sym_resolver.is_some() && !sym.is_data {
+                    writeln!(f, "    {dir} resolve_{idx}")
+                } else {
+                    writeln!(f, "    {dir} 0")
                 }
             }
         ));
@@ -26,6 +34,7 @@ pub(crate) trait StubGenerator {
         if let Some(sym_reslver) = sym_resolver {
             write_lines!(text,
                 "global_asm!{{\""
+                ".type resolver_trampoline, function"
                 "resolver_trampoline:");
             self.write_binder_stub(text, sym_reslver);
             writeln!(text, "\"}}");
@@ -38,6 +47,7 @@ pub(crate) trait StubGenerator {
                     ".text"
                     ".p2align 2, 0x0"
                     ".global \\\"{symbol}\\\"" // Will be unescaped the 2nd time when compiling the generated module.
+                    ".type   \\\"{symbol}\\\", function"
                     "\\\"{symbol}\\\":",
                     symbol = symbol.export_name
                 );
@@ -78,8 +88,14 @@ pub(crate) trait StubGenerator {
     /// `"C" fn resolver(index: u32) -> usize`
     fn write_binder_stub(&self, text: &mut dyn Write, resolver: &str);
 
+    /// Declaration directive for pointer-sized data.
     fn data_ptr_directive(&self) -> &str {
         ".quad"
+    }
+
+    /// A prefix, if any, that needs to be prepended to Rust symbols in order to reference them in assembly code.
+    fn asm_symbol_prefix(&self) -> &str {
+        ""
     }
 }
 

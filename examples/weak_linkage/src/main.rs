@@ -9,8 +9,12 @@ fn main() {
     println!("Loading {}", path.display());
     stubs::exporter_stub.load_from(&path).unwrap();
 
+    let result = stubs::base.if_resolved(|| {
+        importer::addition1(0)
+    }).unwrap();
+
     // Test lazy binding
-    let result = importer::addition1(0);
+    // let result = importer::addition1(0);
     println!("result 1: {}", result);
 
     // Test resolution of API group

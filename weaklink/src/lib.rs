@@ -37,6 +37,7 @@ use std::{
     cell::UnsafeCell,
     ffi::{CStr, CString},
     mem,
+    panic::catch_unwind,
     path::Path,
     sync::atomic::{AtomicU8, AtomicUsize, Ordering},
 };
@@ -45,6 +46,14 @@ pub type Error = Box<dyn std::error::Error>;
 
 pub mod loading;
 
+#[cfg(feature = "checked")]
+use std::{
+    cell::RefCell,
+    sync::{OnceLock, RwLock},
+};
+#[cfg(feature = "checked")]
+use thread_local::ThreadLocal;
+
 /// Represents a weakly linked dynamic library.
 #[repr(C)]
 pub struct Library {
@@ -52,6 +61,17 @@ pub struct Library {
     dylib_names: &'static [&'static str],
     symbol_names: &'static [&'static CStr],
     symbol_table: &'static [Address],
+
+    // Must initialize this stuff lazily, so we can have a const constructor.
+    #[cfg(feature = "checked")]
+    checked_state: OnceLock<CheckedState>,
+}
+
+#[cfg(feature = "checked")]
+struct CheckedState {
+    shadow_symbol_table: &'static [Address],
+    global_asserted: RwLock<Box<[u8]>>,
+    thread_asserted: ThreadLocal<RefCell<Box<[u8]>>>,
 }
 
 impl Library {
@@ -66,6 +86,8 @@ impl Library {
             dylib_names,
             symbol_names,
             symbol_table,
+            #[cfg(feature = "checked")]
+            checked_state: OnceLock::new(),
         }
     }
 
@@ -118,7 +140,7 @@ impl Library {
         }
     }
 
-    // Make sure the library is loaded (or panic).
+    // Make sure the library is loaded, or panic.
     fn ensure_loaded(&self) -> DylibHandle {
         match self.handle() {
             Some(handle) => handle,
@@ -138,32 +160,136 @@ impl Library {
 
     // Resolve symbol address and update its entry in the symbol table.
     fn resolve_symbol(&self, sym_index: u32) -> Result<Address, Error> {
-        let result = self.resolve_symbol_uncached(sym_index);
-        if let Ok(address) = &result {
-            unsafe {
-                self.symbol_table_entry(sym_index as usize).write(*address);
+        unsafe {
+            let entry = self.symbol_table_entry(sym_index);
+
+            #[cfg(feature = "checked")]
+            {
+                let addr = entry.read();
+                if addr != 0 {
+                    return Ok(addr);
+                }
             }
+
+            let result = self.resolve_symbol_uncached(sym_index);
+            if let Ok(address) = &result {
+                entry.write(*address);
+            }
+            result
         }
-        result
     }
 
-    // This entry is called to resolve symbols at call time, so it panicks on error.
+    // This function gets invoked by the lazy resolver when a symbol is called into.
     #[doc(hidden)]
     pub fn lazy_resolve(&self, sym_index: u32) -> Address {
-        match self.resolve_symbol(sym_index) {
-            Ok(sym_addr) => sym_addr,
-            Err(err) => panic!("Symbol not found: {}", err),
+        let result = catch_unwind(|| {
+            self.check_asserted(sym_index);
+            match self.resolve_symbol(sym_index) {
+                Ok(sym_addr) => sym_addr,
+                Err(err) => panic!("Symbol could not be resolved: {}", err),
+            }
+        });
+
+        match result {
+            Ok(address) => address,
+            // Can't unwind since we can't guarantee anything about the context this is invoked in.
+            Err(_) => {
+                std::process::abort();
+            }
         }
     }
 
     // Get a reference to symbol pointer.
-    unsafe fn symbol_table_entry(&self, sym_index: usize) -> *mut Address {
+    #[cfg(not(feature = "checked"))]
+    unsafe fn symbol_table_entry(&self, sym_index: u32) -> *mut Address {
         let ptr: &UnsafeCell<Address> = mem::transmute(&self.symbol_table[0]);
         ptr.get().offset(sym_index as isize) as *mut Address
     }
+
+    #[cfg(not(feature = "checked"))]
+    fn assert_resolved(&self, _sym_indices: &[u32]) {}
+
+    #[cfg(not(feature = "checked"))]
+    fn deassert_resolved(&self, _sym_indices: &[u32]) {}
+
+    #[cfg(not(feature = "checked"))]
+    fn global_assert_resolved(&self, _sym_indices: &[u32]) {}
+
+    #[cfg(not(feature = "checked"))]
+    fn check_asserted(&self, _sym_index: u32) -> bool {
+        true
+    }
+
+    // In checked mode we do not update the real symbol table, because that would prevent
+    // further callbacks on symbol use.  Instead, we cache addresses in the shadow table.
+    #[cfg(feature = "checked")]
+    unsafe fn symbol_table_entry(&self, sym_index: u32) -> *mut Address {
+        let checked = self.checked_state.get().unwrap();
+        let ptr: &UnsafeCell<Address> = mem::transmute(&checked.shadow_symbol_table[0]);
+        ptr.get().offset(sym_index as isize) as *mut Address
+    }
+
+    #[cfg(feature = "checked")]
+    fn init_checked_state(&self) {
+        self.checked_state.get_or_init(|| CheckedState {
+            shadow_symbol_table: Box::leak(boxed_slice(self.symbol_table.len())),
+            global_asserted: RwLock::new(boxed_slice(self.symbol_table.len())),
+            thread_asserted: ThreadLocal::new(),
+        });
+    }
+
+    #[cfg(feature = "checked")]
+    fn assert_resolved(&self, sym_indices: &[u32]) {
+        let checked_state = self.checked_state.get().unwrap();
+        let mut asserted = checked_state
+            .thread_asserted
+            .get_or(|| RefCell::new(boxed_slice(self.symbol_table.len())))
+            .borrow_mut();
+        for sym_index in sym_indices {
+            asserted[*sym_index as usize] += 1;
+        }
+    }
+
+    #[cfg(feature = "checked")]
+    fn deassert_resolved(&self, sym_indices: &[u32]) {
+        let checked_state = self.checked_state.get().unwrap();
+        let mut asserted = checked_state.thread_asserted.get().unwrap().borrow_mut();
+        for sym_index in sym_indices {
+            asserted[*sym_index as usize] -= 1;
+        }
+    }
+
+    #[cfg(feature = "checked")]
+    fn global_assert_resolved(&self, sym_indices: &[u32]) {
+        let checked_state = self.checked_state.get().unwrap();
+        let mut global_asserted = checked_state.global_asserted.write().unwrap();
+        for sym_index in sym_indices {
+            global_asserted[*sym_index as usize] = 1;
+        }
+    }
+
+    #[cfg(feature = "checked")]
+    fn check_asserted(&self, sym_index: u32) {
+        // Any failure below indicates that assert_resolved() hadn't been called.
+        let fail = || -> ! {
+            panic!(
+                "Symbol {:?} was used without having been asserted as resolved.",
+                self.symbol_names[sym_index as usize]
+            );
+        };
+
+        let checked_state = self.checked_state.get().unwrap_or_else(|| fail());
+        let global_asserted = checked_state.global_asserted.read().unwrap();
+        if global_asserted[sym_index as usize] == 0 {
+            let asserted = checked_state.thread_asserted.get().unwrap_or_else(|| fail()).borrow();
+            if asserted[sym_index as usize] == 0 {
+                fail();
+            }
+        }
+    }
 }
 
-/// Represents a symbol group defined at build time.
+/// Represents symbol group defined at build time.
 #[repr(C)]
 pub struct Group {
     library: &'static Library,
@@ -187,6 +313,9 @@ impl Group {
 
     /// Attempt to resolve all symbols in the group.
     pub fn resolve_uncached(&self) -> Result<(), Error> {
+        #[cfg(feature = "checked")]
+        self.library.init_checked_state();
+
         for sym_index in self.sym_indices {
             if let Err(err) = self.library.resolve_symbol(*sym_index) {
                 return Err(err);
@@ -201,7 +330,10 @@ impl Group {
             GROUP_STATUS_UNRESOLVED => {
                 let result = self.resolve_uncached().is_ok();
                 let status = match result {
-                    true => GROUP_STATUS_RESOLVED,
+                    true => {
+                        self.library.global_assert_resolved(self.sym_indices);
+                        GROUP_STATUS_RESOLVED
+                    }
                     false => GROUP_STATUS_FAILED,
                 };
                 self.status.store(status, Ordering::Release);
@@ -211,4 +343,22 @@ impl Group {
             GROUP_STATUS_FAILED | _ => false,
         }
     }
+
+    pub fn if_resolved<R>(&self, f: impl Fn() -> R) -> Result<R, Error> {
+        if self.resolve() {
+            self.library.assert_resolved(self.sym_indices);
+            let result = f();
+            self.library.deassert_resolved(self.sym_indices);
+            Ok(result)
+        } else {
+            Err("Symbol group could not be resolved".into())
+        }
+    }
+}
+
+#[cfg(feature = "checked")]
+fn boxed_slice<T: Copy + Default>(size: usize) -> Box<[T]> {
+    let mut v = Vec::<T>::with_capacity(size);
+    v.resize(size, Default::default());
+    v.into_boxed_slice()
 }

@@ -19,6 +19,8 @@ use std::{env, fmt};
 
 use util::iter_fmt;
 
+use crate::stub_gen::TargetOs;
+
 type Error = Box<dyn std::error::Error>;
 
 #[derive(Clone, Default, Debug)]
@@ -187,13 +189,15 @@ impl Config {
             ");",
             name = self.name,
             dylib_names = iter_fmt(&self.dylib_names, |f, name| write!(f, "\"{name}\",")),
-            symbol_names = iter_fmt(stubs.as_ref(), |f, sym|
-                writeln!(f, "      CStr::from_bytes_with_nul_unchecked(b\"{}\\0\"),", sym.import_name)),
+            symbol_names = iter_fmt(stubs.as_ref().iter().enumerate(), |f, (i, sym)|
+                writeln!(f, "      CStr::from_bytes_with_nul_unchecked(b\"{}\\0\"), // {i}", sym.import_name)),
             sym_table=sym_table
         );
 
         // Emit group objects
         for (grp_name, indices) in &self.groups {
+            let mut indices = indices.clone();
+            indices.sort();
             write_lines!(text,
                 "#[no_mangle]"
                 "#[allow(non_upper_case_globals)]"
@@ -207,38 +211,42 @@ impl Config {
             );
         }
 
-        // Emit symbol table and PLT
-        let stub_gen: Box<dyn stub_gen::StubGenerator> = if self.target.starts_with("x86_64-") {
-            if !self.target.starts_with("x86_64-pc-windows-") {
-                Box::new(stub_gen::x64::X64StubGenerator::new_itanium())
-            } else {
-                Box::new(stub_gen::x64::X64StubGenerator::new_windows())
-            }
-        } else if self.target.starts_with("aarch64-") {
-            if self.target.contains("apple") {
-                Box::new(stub_gen::aarch64::Aarch64StubGenerator::new_macos())
-            } else {
-                Box::new(stub_gen::aarch64::Aarch64StubGenerator::new_linux())
-            }
-        } else if self.target.starts_with("arm") {
-            Box::new(stub_gen::arm::ArmStubGenerator::new())
+        let target_os = if self.target.contains("linux") {
+            TargetOs::Linux
+        } else if self.target.contains("apple") {
+            TargetOs::MacOS
+        } else if self.target.contains("windows") {
+            TargetOs::Windows
         } else {
-            panic!("Unsupported target");
+            panic!("Unsupported OS");
         };
 
-        let sym_reslver = if self.lazy_binding {
+        // Emit symbol table and PLT
+        let stub_gen: Box<dyn stub_gen::StubGenerator> = if self.target.starts_with("x86_64-") {
+            Box::new(stub_gen::x64::X64StubGenerator { target_os })
+        } else if self.target.starts_with("aarch64-") {
+            Box::new(stub_gen::aarch64::Aarch64StubGenerator { target_os })
+        } else if self.target.starts_with("arm") {
+            Box::new(stub_gen::arm::ArmStubGenerator {})
+        } else {
+            panic!("Unsupported arch");
+        };
+
+        let sym_resolver = if self.lazy_binding {
+            let sym_resolver = format!("resolver_{:08x}", rand::random::<u64>());
             write_lines!(text,
                 "#[no_mangle]"
-                "extern \"C\" fn sym_resolver(index: u32) -> Address {{"
+                "extern \"C\" fn {sym_resolver}(index: u32) -> Address {{"
                 "    {name}.lazy_resolve(index)"
                 "}}",
-                name = self.name
+                name = self.name,
+                sym_resolver=sym_resolver
             );
-            Some("sym_resolver")
+            Some(sym_resolver)
         } else {
             None
         };
 
-        stub_gen.generate(text, stubs.as_ref(), &sym_table, sym_reslver);
+        stub_gen.generate(text, stubs.as_ref(), &sym_table, sym_resolver.as_deref());
     }
 }
