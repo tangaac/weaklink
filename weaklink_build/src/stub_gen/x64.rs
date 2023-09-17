@@ -44,11 +44,13 @@ impl super::StubGenerator for X64StubGenerator {
 
         write_lines!(text,
             "   .cfi_startproc"
-            "   .cfi_def_cfa rsp, 8"
-            "    push rbp"
-            "    mov rbp, rsp"
-            "   .cfi_def_cfa rbp, 16"
-            // Re-align stack to 16 bytes
+            "   .cfi_def_cfa rsp, 16"
+            "    push rbx"
+            "    .cfi_adjust_cfa_offset 8"
+            "    mov rbx, rsp"
+            "   .cfi_def_cfa_register rbx"
+            // We don't know whether the stub was call'ed or jmp'ed to,
+            // better make sure stack is 16-aligned.
             "    and rsp, ~0xF"
 
             // Save volatile registers:
@@ -65,13 +67,13 @@ impl super::StubGenerator for X64StubGenerator {
             "    push r10"
             "    push r11"
 
-            // Windows ABI requires us to allocate 4 "home" slots for register parameters,
-            // plus, we need one slot to keep stack 16-aligned after pushing 9 registers above.
+            // Windows ABI requires us to allocate 4 "home slots" for register parameters,
+            // we also need one extra slot to keep stack 16-aligned after having pushed 9 registers above.
             "    sub rsp, 8*5"
-            "    mov {first_param}, [rbp + 8]"
+            "    mov {first_param}, [rbx + 8]"
             "    call {pfx}{resolver}"
             "    add rsp, 8*5"
-            "    mov [rbp + 8], rax" // Replace symbol table index with the returned symbol address
+            "    mov [rbx + 8], rax" // Replace symbol table index with the returned symbol address
 
             "    pop r11"
             "    pop r10"
@@ -83,8 +85,8 @@ impl super::StubGenerator for X64StubGenerator {
             "    pop rcx"
             "    pop rax"
 
-            "    mov rsp, rbp"
-            "    pop rbp"
+            "    mov rsp, rbx"
+            "    pop rbx"
             "    ret"
             "    .cfi_endproc"
             ,

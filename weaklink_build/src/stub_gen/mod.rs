@@ -13,7 +13,6 @@ pub(crate) trait StubGenerator {
     fn generate(&self, text: &mut dyn Write, symbols: &[SymbolStub], symbol_table: &str, sym_resolver: Option<&str>) {
         write_lines!(text,
             "global_asm!{{\""
-            ".cfi_sections"
             ".data"
             ".p2align 2, 0x0"
             "{pfx}{symbol_table}:"
