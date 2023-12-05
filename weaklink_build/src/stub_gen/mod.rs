@@ -33,7 +33,9 @@ pub(crate) trait StubGenerator {
         if let Some(sym_reslver) = sym_resolver {
             write_lines!(text,
                 "global_asm!{{\""
-                ".type resolver_trampoline, function"
+                ".text"
+                ".p2align 2, 0x0"
+                //".type resolver_trampoline, function"
                 "resolver_trampoline:");
             self.write_binder_stub(text, sym_reslver);
             writeln!(text, "\"}}");
@@ -46,7 +48,7 @@ pub(crate) trait StubGenerator {
                     ".text"
                     ".p2align 2, 0x0"
                     ".global \\\"{symbol}\\\"" // Will be unescaped the 2nd time when compiling the generated module.
-                    ".type   \\\"{symbol}\\\", function"
+                    //".type   \\\"{symbol}\\\", function"
                     "\\\"{symbol}\\\":",
                     symbol = symbol.export_name
                 );
