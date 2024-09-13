@@ -12,8 +12,6 @@ importer = {path = "../importer"}
 [build-dependencies]
 weaklink_build = {path = "../../weaklink_build"}
 utils = {path = "../utils"}
-# exporter = {path = "../exporter"}
-# importer = {path = "../importer"}
 
 [features]
 checked = ["weaklink/checked"]

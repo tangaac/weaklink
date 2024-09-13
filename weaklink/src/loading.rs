@@ -1,13 +1,21 @@
-pub use platform::*;
+//! Provides a platform-agnostic interface for loading dynamic libraries and finding symbols within them.
 
+#[cfg(any(unix))]
+pub use unix::{find_symbol, load_library};
+#[cfg(any(windows))]
+pub use windows::{find_symbol, load_library};
+
+/// Represents a handle to a dynamic library.
 #[repr(transparent)]
 #[derive(Copy, Clone)]
 pub struct DylibHandle(pub usize);
 
+/// Represents an address in memory.
 pub type Address = usize;
 
-#[cfg(unix)]
-mod platform {
+/// Unix-spcific loading functions.
+#[cfg(any(unix, doc))]
+pub mod unix {
     use super::{Address, DylibHandle};
     use crate::Error;
     use std::ffi::CStr;
@@ -33,6 +41,7 @@ mod platform {
         fn dlerror() -> *const c_char;
     }
 
+    /// Loads a dynamic library with the specified flags.
     pub fn load_library_with_flags(path: &CStr, flags: c_int) -> Result<DylibHandle, Error> {
         unsafe {
             let handle = dlopen(path.as_ptr() as *const c_char, flags);
@@ -44,10 +53,12 @@ mod platform {
         }
     }
 
+    /// Loads a dynamic library with lazy binding and global visibility.
     pub fn load_library(path: &CStr) -> Result<DylibHandle, Error> {
         load_library_with_flags(path, RTLD_LAZY | RTLD_GLOBAL)
     }
 
+    /// Finds a symbol in a dynamic library.
     pub fn find_symbol(handle: DylibHandle, name: &CStr) -> Result<Address, Error> {
         unsafe {
             let ptr = dlsym(handle.0 as *const c_void, name.as_ptr() as *const c_char);
@@ -60,22 +71,23 @@ mod platform {
     }
 }
 
-#[cfg(windows)]
-mod platform {
+/// Windows-specific loading functions.
+#[cfg(any(windows, doc))]
+pub mod windows {
     use super::{Address, DylibHandle};
     use crate::Error;
     use std::ffi::CStr;
     use std::os::raw::{c_char, c_void};
 
-    const LOAD_WITH_ALTERED_SEARCH_PATH: u32 = 0x00000008;
-    const LOAD_LIBRARY_SEARCH_APPLICATION_DIR: u32 = 0x00000200;
-    const LOAD_LIBRARY_SEARCH_DEFAULT_DIRS: u32 = 0x00001000;
-    const LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR: u32 = 0x00000100;
-    const LOAD_LIBRARY_SEARCH_SYSTEM32: u32 = 0x00000800;
-    const LOAD_LIBRARY_SEARCH_USER_DIRS: u32 = 0x00000400;
-    const LOAD_LIBRARY_REQUIRE_SIGNED_TARGET: u32 = 0x00000080;
-    const LOAD_IGNORE_CODE_AUTHZ_LEVEL: u32 = 0x00000010;
-    const LOAD_LIBRARY_SAFE_CURRENT_DIRS: u32 = 0x00002000;
+    pub const LOAD_WITH_ALTERED_SEARCH_PATH: u32 = 0x00000008;
+    pub const LOAD_LIBRARY_SEARCH_APPLICATION_DIR: u32 = 0x00000200;
+    pub const LOAD_LIBRARY_SEARCH_DEFAULT_DIRS: u32 = 0x00001000;
+    pub const LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR: u32 = 0x00000100;
+    pub const LOAD_LIBRARY_SEARCH_SYSTEM32: u32 = 0x00000800;
+    pub const LOAD_LIBRARY_SEARCH_USER_DIRS: u32 = 0x00000400;
+    pub const LOAD_LIBRARY_REQUIRE_SIGNED_TARGET: u32 = 0x00000080;
+    pub const LOAD_IGNORE_CODE_AUTHZ_LEVEL: u32 = 0x00000010;
+    pub const LOAD_LIBRARY_SAFE_CURRENT_DIRS: u32 = 0x00002000;
 
     #[link(name = "kernel32")]
     extern "system" {

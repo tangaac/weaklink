@@ -1,4 +1,5 @@
 #![allow(unused)]
+#![doc = include_str!("../README.md")]
 
 macro_rules! write_lines {
     ($dest:expr, $($line:literal)+ $(, $name:ident=$value:expr)*) => (write!($dest, concat!($($line,"\n"),+) $(, $name=$value)*))
@@ -52,16 +53,22 @@ impl SymbolStub {
 }
 
 pub struct Config {
-    /// Name of the static object representing the wrapped dylib.
+    /// Name of the static variable that exposes management API in the generated stubs crate.
     pub name: String,
-    /// Target triple to generate code for. Default: current cargo build target.
+    /// Target triple to generate code for.
     pub target: String,
-    /// Dylib names to try when loading implicitly. Default: []
+    /// Dylib names to try when loading implicitly.
     pub dylib_names: Vec<String>,
-    /// Whether to perform symbol name adjustment. Currently this handles the following quirk of MacOS:
-    /// Default: true
+    /// Whether to perform symbol name adjustment. 
+    /// 
+    /// Currently this handles a quirk of MacOSX linker, which automatically adds leading underscores to all exports.
     pub adjust_symbol_names: bool,
-    /// Whether to support lazy binding. Default: false
+    /// Whether to support lazy binding.
+    /// 
+    /// Laxy binding allows calling functions from the wrapped library without resolving them ahead of time.
+    /// The cons of laxy binding are:
+    /// - It is not possible to gracefully handle missing library or symbols.  Should this happen, the program will panic.
+    /// - Adds some overhead to each call.
     pub lazy_binding: bool,
     // The list of symbol stubs created so far.
     stubs: Vec<SymbolStub>,
@@ -72,8 +79,12 @@ pub struct Config {
 }
 
 impl Config {
-    /// Create a new build configuration.
-    /// `name` specifies the name of the generated static variable.
+    /// Create a new build configuration with the following defaults
+    /// - [`name`](`Config::name`): The `name` parameter.
+    /// - [`target`](`Config::target`): The current cargo build target.
+    /// - [`dylib_names`](`Config::dylib_names`): An empty vector.
+    /// - [`adjust_symbol_names`](`Config::adjust_symbol_names`): `true`
+    /// - [`lazy_binding`](`Config::lazy_binding`): `false`
     pub fn new(name: &str) -> Self {
         let target = match env::var("TARGET") {
             Ok(target) => target,
