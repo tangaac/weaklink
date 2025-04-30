@@ -9,21 +9,22 @@ fn main() {
     println!("Loading {}", path.display());
     stubs::exporter_stub.load_from(&path).unwrap();
 
-    let result = stubs::base.if_resolved(|| {
-        importer::addition1(0)
-    }).unwrap();
-
-    // Test lazy binding
-    // let result = importer::addition1(0);
+    // Test scoped resolution
+    let token = stubs::base.resolve().unwrap();
+    let result = importer::addition1(0);
     println!("result 1: {}", result);
+    drop(token);
 
-    // Test resolution of API group
-    stubs::base.resolve_uncached().unwrap();
+    #[cfg(feature = "checked")]
+    assert_eq!(unsafe { importer::get_SOMEDATA() }, std::ptr::null());
+
+    // Test resolve_global()
+    stubs::base.resolve().unwrap().mark_permanent();
     let result = importer::addition2(0);
     println!("result 2: {}", result);
 
     // Test resolution of missing symbols
-    assert!(!stubs::missing.resolve());
+    assert!(stubs::missing.resolve().is_err());
 
     println!("OK");
 }

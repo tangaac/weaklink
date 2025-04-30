@@ -8,6 +8,7 @@ use superslice::Ext;
 
 use crate::{Error, SymbolStub};
 
+#[derive(Clone, Debug)]
 pub struct Export {
     /// Name of the exported symbol.
     ///

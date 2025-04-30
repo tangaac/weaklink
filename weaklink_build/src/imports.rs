@@ -7,6 +7,7 @@ use goblin::*;
 
 use crate::{Error, SymbolStub};
 
+#[derive(Clone, Debug)]
 pub struct Import {
     pub name: String,
 }
@@ -37,7 +38,8 @@ fn get_unique_imports(buffer: &[u8], imports: &mut HashSet<String>) -> Result<()
             for (_, rsection) in &elf.shdr_relocs {
                 for reloc in rsection {
                     if let Some(sym) = elf.syms.get(reloc.r_sym) {
-                        if sym.is_import() {
+                        // check st_shndx as well because of https://github.com/m4b/goblin/issues/288
+                        if sym.is_import() && sym.st_shndx == 0 {
                             if let Some(sym_name) = elf.strtab.get_at(sym.st_name) {
                                 imports.insert(sym_name.into());
                             }

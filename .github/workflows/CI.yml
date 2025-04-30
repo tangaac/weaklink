@@ -65,7 +65,7 @@ jobs:
     - name: Install Rust
       uses: actions-rs/toolchain@v1
       with:
-          toolchain: 1.65.0
+          toolchain: 1.70.0
           target: ${{ matrix.target }}
           override: true
 
@@ -80,7 +80,14 @@ jobs:
       uses: actions-rs/cargo@v1
       with:
         command: test
-        args: ${{ matrix.target && format('--target={0}', matrix.target) }} ${{ matrix.test_cargo_args }}
+        args: ${{ matrix.target && format('--target={0}', matrix.target) }}
+        use-cross: ${{ matrix.cross }}
+
+    - name: Test checked
+      uses: actions-rs/cargo@v1
+      with:
+        command: test
+        args: ${{ matrix.target && format('--target={0}', matrix.target) }} --features=checked
         use-cross: ${{ matrix.cross }}
 
     - name: Cache save

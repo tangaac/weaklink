@@ -35,6 +35,7 @@ pub struct SymbolStub {
 }
 
 impl SymbolStub {
+    /// Create a stub for exported code symbol `name`.
     pub fn new(name: &str) -> SymbolStub {
         SymbolStub {
             import_name: name.to_string(),
@@ -43,6 +44,8 @@ impl SymbolStub {
         }
     }
 
+    /// Create a stub for for exported data symbol `exp_name`.
+    /// The client-side accessor function will be named `imp_name`.
     pub fn new_data(exp_name: &str, imp_name: &str) -> SymbolStub {
         SymbolStub {
             export_name: exp_name.to_string(),
@@ -63,13 +66,7 @@ pub struct Config {
     /// 
     /// Currently this handles a quirk of MacOSX linker, which automatically adds leading underscores to all exports.
     pub adjust_symbol_names: bool,
-    /// Whether to support lazy binding.
-    /// 
-    /// Laxy binding allows calling functions from the wrapped library without resolving them ahead of time.
-    /// The cons of laxy binding are:
-    /// - It is not possible to gracefully handle missing library or symbols.  Should this happen, the program will panic.
-    /// - Adds some overhead to each call.
-    pub lazy_binding: bool,
+
     // The list of symbol stubs created so far.
     stubs: Vec<SymbolStub>,
     // Look up index in `stubs` by the export name.
@@ -84,7 +81,6 @@ impl Config {
     /// - [`target`](`Config::target`): The current cargo build target.
     /// - [`dylib_names`](`Config::dylib_names`): An empty vector.
     /// - [`adjust_symbol_names`](`Config::adjust_symbol_names`): `true`
-    /// - [`lazy_binding`](`Config::lazy_binding`): `false`
     pub fn new(name: &str) -> Self {
         let target = match env::var("TARGET") {
             Ok(target) => target,
@@ -96,7 +92,6 @@ impl Config {
             target: target,
             dylib_names: vec![],
             adjust_symbol_names: true,
-            lazy_binding: false,
             stubs: Vec::new(),
             stub_by_exp: HashMap::new(),
             groups: HashMap::new(),
@@ -213,6 +208,7 @@ impl Config {
                 "#[no_mangle]"
                 "#[allow(non_upper_case_globals)]"
                 "pub static {grp_name}: Group = Group::new("
+                "    \"{grp_name}\","
                 "    &{name},"
                 "    &[{indices}],"
                 ");",
@@ -243,21 +239,6 @@ impl Config {
             panic!("Unsupported arch");
         };
 
-        let sym_resolver = if self.lazy_binding {
-            let sym_resolver = format!("resolver_{:08x}", rand::random::<u64>());
-            write_lines!(text,
-                "#[no_mangle]"
-                "extern \"C\" fn {sym_resolver}(index: u32) -> Address {{"
-                "    {name}.lazy_resolve(index)"
-                "}}",
-                name = self.name,
-                sym_resolver=sym_resolver
-            );
-            Some(sym_resolver)
-        } else {
-            None
-        };
-
-        stub_gen.generate(text, stubs.as_ref(), &sym_table, sym_resolver.as_deref());
+        stub_gen.generate(text, stubs.as_ref(), &sym_table);
     }
 }

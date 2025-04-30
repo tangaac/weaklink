@@ -18,16 +18,17 @@ fn main() {
     let imports_str = HashSet::<String>::from_iter(imports.iter().map(|i| i.name.clone()));
     let exports_str = HashSet::<String>::from_iter(exports.iter().map(|e| e.name.clone()));
     let common = exports_str.intersection(&imports_str).collect::<HashSet<_>>();
-    let symbols = exports
+    let mut stubs = exports
         .into_iter()
         .filter(|e| common.contains(&e.name))
         .map(|e| SymbolStub::new(&e.name))
         .collect::<Vec<_>>();
+    stubs.push(SymbolStub::new_data("get_SOMEDATA", "SOMEDATA"));
 
-    println!("cargo:warning=Found {} common symbols", symbols.len());
+    println!("cargo:warning=Found {} common symbols", stubs.len());
 
     let mut config = Config::new("exporter_stub");
-    config.add_symbol_group("base", symbols).unwrap();
+    config.add_symbol_group("base", stubs).unwrap();
 
     let missing = vec![SymbolStub::new("foo"), SymbolStub::new_data("get_bar", "bar")];
     config.add_symbol_group("missing", missing).unwrap();
@@ -35,7 +36,6 @@ fn main() {
     let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
     let source_path = out_dir.join("stubs.rs");
     let mut source = File::create(&source_path).unwrap();
-    config.lazy_binding = true;
     config.generate_source(&mut source);
     println!("cargo:rerun-if-changed={}", source_path.display());
     println!("cargo:warning=Generated {}", source_path.display());

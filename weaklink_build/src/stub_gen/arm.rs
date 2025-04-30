@@ -17,35 +17,6 @@ impl super::StubGenerator for ArmStubGenerator {
         );
     }
 
-    fn write_jmp_binder(&self, text: &mut dyn Write, index: usize, binder: &str) {
-        write_lines!(text,
-            "    ldr r12, ={index}"
-            "    b {binder}",
-            index=index,
-            binder=binder
-        );
-    }
-
-    fn write_binder_stub(&self, text: &mut dyn Write, resolver: &str) {
-        write_lines!(text,
-            "    .cfi_startproc"
-            "    push {{{{ r0, r1, r2, r3, lr }}}}"
-            "    .cfi_def_cfa sp, 24"
-            "    mov r7, sp"
-            "    .cfi_def_cfa r7, 24"
-            // Re-align stack to 8 bytes
-            "    bic sp, sp, #7"
-            "    mov r0, r12"
-            "    bl {resolver}"
-            "    mov r12, r0"
-            "    mov sp, r7"
-            "    pop {{{{ r0, r1, r2, r3, lr }}}}"
-            "    bx r12"
-            "    .cfi_endproc",
-            resolver=resolver
-        );
-    }
-
     fn data_ptr_directive(&self) -> &str {
         ".long"
     }
