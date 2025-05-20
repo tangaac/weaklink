@@ -55,7 +55,7 @@ pub mod loading;
 
 use std::{
     cell::UnsafeCell,
-    ffi::{CStr, CString},
+    ffi::CStr,
     mem,
     path::Path,
     sync::atomic::{AtomicUsize, Ordering},
@@ -111,8 +111,7 @@ impl Library {
             return Err("Already loaded.".into());
         } else {
             for name in self.dylib_names {
-                let cpath = CString::new(*name).unwrap();
-                if let Ok(handle) = loading::load_library(&cpath) {
+                if let Ok(handle) = loading::load_library(Path::new(name)) {
                     self.handle.store(handle.0, Ordering::Release);
                     return Ok(handle);
                 }
@@ -127,8 +126,7 @@ impl Library {
         if raw_handle != 0 {
             Err("Already loaded.".into())
         } else {
-            let cpath = CString::new(path.as_os_str().to_str().unwrap().as_bytes()).unwrap();
-            match loading::load_library(&cpath) {
+            match loading::load_library(path) {
                 Ok(handle) => {
                     self.handle.store(handle.0, Ordering::Release);
                     Ok(handle)

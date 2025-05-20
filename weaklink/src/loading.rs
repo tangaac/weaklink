@@ -18,8 +18,11 @@ pub type Address = usize;
 pub mod unix {
     use super::{Address, DylibHandle};
     use crate::Error;
-    use std::ffi::CStr;
+    use std::ffi::{CStr, CString};
     use std::os::raw::{c_char, c_int, c_void};
+    #[cfg(unix)]
+    use std::os::unix::ffi::OsStrExt;
+    use std::path::Path;
 
     pub const RTLD_LAZY: c_int = 0x0001;
     pub const RTLD_NOW: c_int = 0x0002;
@@ -42,9 +45,10 @@ pub mod unix {
     }
 
     /// Loads a dynamic library with the specified flags.
-    pub fn load_library_with_flags(path: &CStr, flags: c_int) -> Result<DylibHandle, Error> {
+    pub fn load_library_with_flags(path: &Path, flags: c_int) -> Result<DylibHandle, Error> {
+        let path_buf = CString::new(path.as_os_str().as_bytes()).unwrap();
         unsafe {
-            let handle = dlopen(path.as_ptr() as *const c_char, flags);
+            let handle = dlopen(path_buf.as_ptr(), flags);
             if handle.0 == 0 {
                 Err(format!("{:?}", CStr::from_ptr(dlerror())).into())
             } else {
@@ -54,14 +58,14 @@ pub mod unix {
     }
 
     /// Loads a dynamic library with lazy binding and global visibility.
-    pub fn load_library(path: &CStr) -> Result<DylibHandle, Error> {
+    pub fn load_library(path: &Path) -> Result<DylibHandle, Error> {
         load_library_with_flags(path, RTLD_LAZY | RTLD_GLOBAL)
     }
 
     /// Finds a symbol in a dynamic library.
     pub fn find_symbol(handle: DylibHandle, name: &CStr) -> Result<Address, Error> {
         unsafe {
-            let ptr = dlsym(handle.0 as *const c_void, name.as_ptr() as *const c_char);
+            let ptr = dlsym(handle.0 as *const c_void, name.as_ptr());
             if ptr == 0 {
                 Err(format!("{:?}", CStr::from_ptr(dlerror())).into())
             } else {
@@ -77,7 +81,10 @@ pub mod windows {
     use super::{Address, DylibHandle};
     use crate::Error;
     use std::ffi::CStr;
-    use std::os::raw::{c_char, c_void};
+    use std::os::raw::{c_char, c_ushort, c_void};
+    #[cfg(windows)]
+    use std::os::windows::ffi::OsStrExt;
+    use std::path::Path;
 
     pub const LOAD_WITH_ALTERED_SEARCH_PATH: u32 = 0x00000008;
     pub const LOAD_LIBRARY_SEARCH_APPLICATION_DIR: u32 = 0x00000200;
@@ -91,14 +98,16 @@ pub mod windows {
 
     #[link(name = "kernel32")]
     extern "system" {
-        fn LoadLibraryExA(filename: *const c_char, hfile: DylibHandle, flags: u32) -> DylibHandle;
+        fn LoadLibraryExW(filename: *const c_ushort, hfile: DylibHandle, flags: u32) -> DylibHandle;
         fn GetProcAddress(raw_handle: *const c_void, symbol: *const c_char) -> Address;
         fn GetLastError() -> u32;
     }
 
-    pub fn load_library_ex(path: &CStr, flags: u32) -> Result<DylibHandle, Error> {
+    pub fn load_library_ex(path: &Path, flags: u32) -> Result<DylibHandle, Error> {
+        let mut path_buf = path.as_os_str().encode_wide().collect::<Vec<_>>();
+        path_buf.push(0);
         unsafe {
-            let handle = LoadLibraryExA(path.as_ptr() as *const c_char, DylibHandle(0), flags);
+            let handle = LoadLibraryExW(path_buf.as_ptr(), DylibHandle(0), flags);
             if handle.0 == 0 {
                 Err(format!("Could not load {:?} (err=0x{:08X})", path, GetLastError()).into())
             } else {
@@ -107,13 +116,13 @@ pub mod windows {
         }
     }
 
-    pub fn load_library(path: &CStr) -> Result<DylibHandle, Error> {
+    pub fn load_library(path: &Path) -> Result<DylibHandle, Error> {
         load_library_ex(path, LOAD_WITH_ALTERED_SEARCH_PATH)
     }
 
     pub fn find_symbol(handle: DylibHandle, name: &CStr) -> Result<Address, Error> {
         unsafe {
-            let ptr = GetProcAddress(handle.0 as *const c_void, name.as_ptr() as *const c_char);
+            let ptr = GetProcAddress(handle.0 as *const c_void, name.as_ptr());
             if ptr == 0 {
                 Err(format!("Could not find {:?} (err=0x{:08X})", name, GetLastError()).into())
             } else {
