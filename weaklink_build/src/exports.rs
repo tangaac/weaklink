@@ -1,10 +1,9 @@
-use std::fmt::format;
 use std::fs::File;
 use std::io::{Read, Write};
+use std::ops::Range;
 use std::path::Path;
 
 use goblin::*;
-use superslice::Ext;
 
 use crate::{Error, SymbolStub};
 
@@ -102,7 +101,7 @@ pub fn dylib_exports(path: &Path) -> Result<Vec<Export>, Error> {
 }
 
 struct SectionRanges {
-    ranges: Vec<(u64, u64, String)>,
+    ranges: Vec<(Range<u64>, String)>,
 }
 
 impl SectionRanges {
@@ -111,14 +110,14 @@ impl SectionRanges {
     }
 
     fn insert(&mut self, offset: u64, size: u64, name: String) {
-        let idx = self.ranges.lower_bound_by_key(&offset, |s| s.0);
-        self.ranges.insert(idx, (offset, size, name));
+        let idx = self.ranges.partition_point(|s| s.0.start < offset);
+        self.ranges.insert(idx, (offset..offset + size, name));
     }
 
     fn lookup(&self, offset: u64) -> Option<&str> {
-        let idx = self.ranges.upper_bound_by_key(&offset, |s| s.0);
-        if idx > 0 && self.ranges[idx - 1].0 + self.ranges[idx - 1].1 > offset {
-            Some(&self.ranges[idx - 1].2)
+        let idx = self.ranges.partition_point(|s| s.0.start < offset);
+        if idx > 0 && self.ranges[idx - 1].0.contains(&offset) {
+            Some(&self.ranges[idx - 1].1)
         } else {
             None
         }
