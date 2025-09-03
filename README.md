@@ -1,4 +1,3 @@
-
 This crate implements weak dynamic linking across platforms (Linux, macOS, and Windows), making it easier to work with
 dynamic libraries that may not be installed or may vary in version.
 
@@ -9,8 +8,8 @@ when different versions of the library are in use. Instead of manually managing 
 platform-specific equivalents), Weaklink automatically handles loading and symbol resolution at runtime, simplifying the
 process.
 
-This is especially for calling into plugins that export mangled symbols (like C++ or Rust), since finding out the
-mangled symbol name for a function may be non-trivial.
+This is especially helpful when calling into plugins that export mangled symbols (such as C++ or Rust), since determining
+the mangled symbol name for a function can be non-trivial.
 
 # How does it work?
 
@@ -23,20 +22,23 @@ Conceptually, this is similar to the ELF
 [Delay-loaded DLLs](https://learn.microsoft.com/en-us/cpp/build/reference/linker-support-for-delay-loaded-dlls) on
 Windows.
 
-The generated crate also provides a management API that allows:
-- Overriding the dynamic library's file name.
-- Supplying a dynamic library handle directly.
-- Controlling the loading of pre-defined API groups, which are organized at build time. The management API enables you
-  to check whether all APIs in a group were successfully resolved at runtime, allowing you to avoid calling APIs that
-  are unavailable in the installed version of the library.
+The generated crate also provides a management API that allows you to:
+- Override the dynamic library's file name.
+- Supply a dynamic library handle directly.
+- Control the loading of predefined API groups, which are organized at build time. The management API lets you check
+  whether all APIs in a group were successfully resolved at runtime, so you can avoid calling APIs that are unavailable
+  in the installed version of the library.
 
 # Limitations
-Weaklink supports transparent redirection only for code symbols (functions); handling data symbols would require
-explicit linker support. However, you can still work with data symbols by manually wrapping them, though this requires
-changes in your code. Specifically, you'll need to call a function that returns the address of the data rather than
-accessing the data directly.
+
+Weaklink can only handle function symbols (code). It does not provide transparent support for data symbols (such as
+global variables), because that would require explicit linker support.
+
+If you need to work with data symbols, you must handle them manually in your code. This typically means replacing direct
+data accesses with a function call that returns the address of the data, then dereferencing this address.
 
 # Supported OS and architectures:
-- Linux: x86_64, arm, aarch64
-- MacOS: x86_64, arm64
-- Windows: x86_64
+
+* Linux: x86_64, arm, aarch64
+* MacOS: x86_64, arm64
+* Windows: x86_64
