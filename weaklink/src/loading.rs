@@ -104,7 +104,11 @@ pub mod windows {
     }
 
     pub fn load_library_ex(path: &Path, flags: u32) -> Result<DylibHandle, Error> {
-        let mut path_buf = path.as_os_str().encode_wide().collect::<Vec<_>>();
+        let mut path_buf = path
+            .as_os_str()
+            .encode_wide()
+            .map(|u| if u == '/' as u16 { '\\' as u16 } else { u }) // Normalize slashes
+            .collect::<Vec<_>>();
         path_buf.push(0);
         unsafe {
             let handle = LoadLibraryExW(path_buf.as_ptr(), DylibHandle(0), flags);
