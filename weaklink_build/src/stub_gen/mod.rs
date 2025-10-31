@@ -70,3 +70,4 @@ pub(crate) trait StubGenerator {
 pub(crate) mod aarch64;
 pub(crate) mod arm;
 pub(crate) mod x64;
+pub(crate) mod loongarch;

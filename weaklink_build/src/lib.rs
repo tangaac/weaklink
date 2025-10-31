@@ -235,6 +235,8 @@ impl Config {
             Box::new(stub_gen::aarch64::Aarch64StubGenerator { target_os })
         } else if self.target.starts_with("arm") {
             Box::new(stub_gen::arm::ArmStubGenerator {})
+        } else if self.target.starts_with("loongarch") {
+            Box::new(stub_gen::loongarch::LoongArchStubGenerator {})
         } else {
             panic!("Unsupported arch");
         };
